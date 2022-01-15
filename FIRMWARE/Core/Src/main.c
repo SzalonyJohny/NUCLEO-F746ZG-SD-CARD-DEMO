@@ -32,6 +32,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -61,7 +62,7 @@ static void MX_USB_OTG_FS_PCD_Init(void);
 static void MX_DMA_Init(void);
 static void MX_SDMMC1_SD_Init(void);
 /* USER CODE BEGIN PFP */
-
+FRESULT init_file_system();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -104,6 +105,37 @@ int main(void)
   MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
 
+
+  FRESULT init = init_file_system();
+
+  // ustaiwnie wskaźnika zapisu/odczytu na początku pliku
+  FRESULT status_lseek = f_lseek(&SDFile, 0);
+
+  // przygotowanie buffora do którego zapiszemy dane
+  const uint32_t str_form_sd_len = 64;
+  char buffer_fom_sd[64] = {0};
+
+  // odczyt do '\n' znaku z pliku do buffora o maksymalnej długości str_form_sd_len
+  f_gets(buffer_fom_sd, str_form_sd_len, &SDFile);
+
+  // read specific number of bytes alternative.
+  // If the file needs to be read fast, it should be read in large chunk as possible.
+  f_lseek(&SDFile, 0);
+  uint16_t bytes_to_read = 30;
+  uint16_t bytes_read;
+  f_read(&SDFile, buffer_fom_sd, bytes_to_read, &bytes_read);
+
+  //gets the current read/write pointer of a file
+  uint32_t char_in_file = f_tell(&SDFile);
+
+  // ustawienie wskaźnika zapisu/odczytu na końcu pliku
+  f_lseek(&SDFile, f_size(&SDFile));
+
+
+  uint32_t counter = 0;
+  uint16_t sd_card_save_buff_size = 256;
+  char sd_card_save_buff[256];
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -113,6 +145,16 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+
+	// zapis na kartę sd:
+	f_printf(&SDFile, "Demonstracyjny zapis na kartę SD %d \n", counter++);
+
+	uint16_t bytes_to_write = snprintf(sd_card_save_buff, sd_card_save_buff_size, "Demosntracyjny zapis na karte typ II %d \n", counter);
+	uint16_t number_of_bytes_writen = 0;
+	f_write(&SDFile, sd_card_save_buff, bytes_to_write, &number_of_bytes_writen);
+	f_sync(&SDFile);
+
+	  HAL_Delay(1000);
   }
   /* USER CODE END 3 */
 }
@@ -187,7 +229,7 @@ static void MX_SDMMC1_SD_Init(void)
   hsd1.Init.ClockPowerSave = SDMMC_CLOCK_POWER_SAVE_DISABLE;
   hsd1.Init.BusWide = SDMMC_BUS_WIDE_1B;
   hsd1.Init.HardwareFlowControl = SDMMC_HARDWARE_FLOW_CONTROL_DISABLE;
-  hsd1.Init.ClockDiv = 0;
+  hsd1.Init.ClockDiv = 4;
   /* USER CODE BEGIN SDMMC1_Init 2 */
 
   /* USER CODE END SDMMC1_Init 2 */
@@ -367,7 +409,21 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+FRESULT init_file_system(){
 
+	FRESULT res =  f_mount(&SDFatFS, SDPath, 0);
+	if(FR_OK != res){
+		return res;
+	}
+
+	res =  f_open(&SDFile, "T.txt", FA_OPEN_APPEND | FA_WRITE | FA_READ);
+	if(FR_OK != res){
+		return res;
+	}
+
+	res = f_lseek(&SDFile, f_size(&SDFile));
+	return res;
+}
 /* USER CODE END 4 */
 
 /**
